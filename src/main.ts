@@ -1,9 +1,5 @@
 import MegaverseAPI, { type SoloonColor, type ComethDirection, type PolyanetEntity, type SoloonEntity, type ComethEntity } from './api.js';
-
-// Add delay function to handle rate limiting
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+import pLimit from 'p-limit';
 
 // Phase 1 function (currently unused but kept for reference)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -53,10 +49,7 @@ async function createPhase2Logo(api: MegaverseAPI): Promise<void> {
   console.log('Goal map dimensions:', goalMap.length, 'x', goalMap[0]?.length);
   console.log('First few rows of goal map:', goalMap.slice(0, 3));
 
-  // Collect all entities to create
-  const polyanets: PolyanetEntity[] = [];
-  const soloons: SoloonEntity[] = [];
-  const comeths: ComethEntity[] = [];
+  const entities: (PolyanetEntity | SoloonEntity | ComethEntity)[] = [];
   
   for (let row = 0; row < goalMap.length; row++) {
     for (let column = 0; column < goalMap[row].length; column++) {
@@ -64,69 +57,64 @@ async function createPhase2Logo(api: MegaverseAPI): Promise<void> {
       
       if (cell && typeof cell === 'string' && cell !== 'SPACE') {
         if (cell === 'POLYANET') {
-          polyanets.push({ row, column });
+          entities.push({ row, column } as PolyanetEntity);
         } else if (cell.endsWith('_SOLOON')) {
           const color = cell.replace('_SOLOON', '').toLowerCase() as SoloonColor;
-          soloons.push({ row, column, color });
+          entities.push({ row, column, color } as SoloonEntity);
         } else if (cell.endsWith('_COMETH')) {
           const direction = cell.replace('_COMETH', '').toLowerCase() as ComethDirection;
-          comeths.push({ row, column, direction });
+          entities.push({ row, column, direction } as ComethEntity);
         }
       }
     }
   }
 
-  const totalEntities = polyanets.length + soloons.length + comeths.length;
-  console.log(`Found ${totalEntities} entities: ${polyanets.length} Polyanets, ${soloons.length} Soloons, ${comeths.length} Comeths`);
+  const createEntity = (entity: PolyanetEntity | SoloonEntity | ComethEntity) => {
+    if ('color' in entity) {
+      return { createFn: () => api.createSoloon(entity), displayName: `${entity.color.toUpperCase()}_SOLOON` };
+    }
+    if ('direction' in entity) {
+      return { createFn: () => api.createCometh(entity), displayName: `${entity.direction.toUpperCase()}_COMETH` };
+    }
+    return { createFn: () => api.createPolyanet(entity), displayName: 'POLYANET' };
+  };
 
-  // Combine all entities for batch processing
-  const allEntities = [
-    ...polyanets.map(entity => ({ entity, createFn: () => api.createPolyanet(entity), type: 'POLYANET' })),
-    ...soloons.map(entity => ({ entity, createFn: () => api.createSoloon(entity), type: `${entity.color.toUpperCase()}_SOLOON` })),
-    ...comeths.map(entity => ({ entity, createFn: () => api.createCometh(entity), type: `${entity.direction.toUpperCase()}_COMETH` }))
-  ];
-
-  // Process entities in parallel batches to respect rate limits
-  const batchSize = 5; // Adjust based on API rate limits
-  const batches = [];
+  // Create concurrency limiter (max 4 concurrent requests)
+  const limit = pLimit(4);
   
-  for (let i = 0; i < allEntities.length; i += batchSize) {
-    batches.push(allEntities.slice(i, i + batchSize));
-  }
+  console.log(`Processing ${entities.length} entities with max 4 concurrent requests...`);
 
-  console.log(`Processing ${batches.length} batches of ${batchSize} entities each`);
-
-  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-    const batch = batches[batchIndex];
-    console.log(`Processing batch ${batchIndex + 1}/${batches.length}...`);
-    
-    // Process all entities in the current batch in parallel
-    const promises = batch.map(async ({ entity, createFn, type }) => {
-      try {
-        const response = await createFn();
+  // Process all entities with concurrency control
+  const results = await Promise.allSettled(
+    entities.map(entity =>
+      limit(async () => {
+        const { createFn, displayName } = createEntity(entity);
         
-        if (response.success) {
-          console.log(`Created ${type} at (${entity.row}, ${entity.column})`);
-        } else {
-          console.error(`Failed to create ${type} at (${entity.row}, ${entity.column}): ${response.message}`);
+        try {
+          const response = await createFn();
+          
+          if (response.success) {
+            console.log(`Created ${displayName} at (${entity.row}, ${entity.column})`);
+          } else {
+            console.error(`Failed to create ${displayName} at (${entity.row}, ${entity.column}): ${response.message}`);
+          }
+          
+          return response;
+        } catch (error) {
+          console.error(`Error creating ${displayName} at (${entity.row}, ${entity.column}):`, error);
+          return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
         }
-        
-        return response;
-      } catch (error) {
-        console.error(`Error creating entity at (${entity.row}, ${entity.column}):`, error);
-        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
-      }
-    });
+      })
+    )
+  );
 
-    // Wait for all requests in the batch to complete
-    await Promise.all(promises);
-    
-    // Add delay between batches to respect rate limits
-    if (batchIndex < batches.length - 1) {
-      console.log('Waiting before next batch...');
-      await delay(2000); // 2 second delay between batches
-    }
-  }
+  // Summary of results
+  const successful = results.filter(result => 
+    result.status === 'fulfilled' && result.value.success
+  ).length;
+  const failed = entities.length - successful;
+  
+  console.log(`\nCompleted: ${successful} successful, ${failed} failed out of ${entities.length} entities`);
 
   const validateResponse = await api.validateMap();
   console.log(`Validation result: ${validateResponse.message}`);
