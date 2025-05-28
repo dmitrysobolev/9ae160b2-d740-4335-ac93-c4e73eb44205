@@ -1,0 +1,23 @@
+{
+  "name": "9ae160b2-d740-4335-ac93-c4e73eb44205",
+  "version": "1.0.0",
+  "description": "Crossmint coding challenge solution",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js"
+  },
+  "author": "Dmitry Sobolev",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "axios": "^1.9.0",
+    "p-retry": "^6.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.24"
+  }
+}
