@@ -55,19 +55,19 @@ class MegaverseAPI {
         const message = error.response.data?.message || error.response.statusText;
         return {
           success: false,
-          message: `HTTP error: ${message}`,
+          message: `${context} failed: ${message}`,
         };
       }
       if (error.request) {
         return {
           success: false,
-          message: 'Failed to connect to the API after retries',
+          message: `${context} failed: Unable to connect to the API after retries`,
         };
       }
     }
     return {
       success: false,
-      message: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      message: `${context} failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
   }
 

@@ -1,10 +1,12 @@
-import MegaverseAPI, { type APIResponse, type SoloonColor, type ComethDirection, type PolyanetEntity, type SoloonEntity, type ComethEntity } from './api.js';
+import MegaverseAPI, { type SoloonColor, type ComethDirection, type PolyanetEntity, type SoloonEntity, type ComethEntity } from './api.js';
 
 // Add delay function to handle rate limiting
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Phase 1 function (currently unused but kept for reference)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function createPhase1XShape(api: MegaverseAPI): Promise<void> {
   console.log('Creating Phase 1 X-shape...');
   
