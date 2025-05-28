@@ -77,10 +77,10 @@ class MegaverseAPI {
   ): Promise<APIResponse> {
     try {
       const response = await pRetry(operation, {
-        retries: 3,
-        factor: 2,
-        minTimeout: 1000,
-        maxTimeout: 8000,
+        retries: 5,
+        factor: 3,
+        minTimeout: 2000,
+        maxTimeout: 15000,
         shouldRetry: (error) => this.shouldRetry(error),
         onFailedAttempt: (error) => {
           console.log(`${context} attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`);

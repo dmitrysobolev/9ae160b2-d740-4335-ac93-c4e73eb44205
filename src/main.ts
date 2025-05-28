@@ -79,14 +79,14 @@ async function createPhase2Logo(api: MegaverseAPI): Promise<void> {
     return { createFn: () => api.createPolyanet(entity), displayName: 'POLYANET' };
   };
 
-  // Create concurrency limiter (max 4 concurrent requests)
-  const limit = pLimit(4);
+  // Create concurrency limiter (max 2 concurrent requests)
+  const limit = pLimit(2);
   
-  console.log(`Processing ${entities.length} entities with max 4 concurrent requests...`);
+  console.log(`Processing ${entities.length} entities with max 2 concurrent requests...`);
 
   // Process all entities with concurrency control
   const results = await Promise.allSettled(
-    entities.map(entity =>
+    entities.map((entity, i) =>
       limit(async () => {
         const { createFn, displayName } = createEntity(entity);
         
@@ -94,7 +94,7 @@ async function createPhase2Logo(api: MegaverseAPI): Promise<void> {
           const response = await createFn();
           
           if (response.success) {
-            console.log(`Created ${displayName} at (${entity.row}, ${entity.column})`);
+            console.log(`Created ${displayName} at (${entity.row}, ${entity.column}) [${i + 1}/${entities.length}]`);
           } else {
             console.error(`Failed to create ${displayName} at (${entity.row}, ${entity.column}): ${response.message}`);
           }
