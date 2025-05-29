@@ -40,7 +40,7 @@ async function createPhase2Logo(api: MegaverseAPI): Promise<void> {
 
   console.log('Goal response data:', JSON.stringify(goalResponse.data, null, 2));
 
-  const goalMap = goalResponse.data.goal as Array<Array<unknown>>;
+  const goalMap = goalResponse.data.goal as string[][];
   if (!Array.isArray(goalMap)) {
     console.error('Invalid goal map format');
     return;
